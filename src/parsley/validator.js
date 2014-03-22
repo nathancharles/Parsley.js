@@ -136,15 +136,35 @@ define('parsley/validator', [
         return $.extend(assert, { priority: 256 });
       },
       pattern: function (regexp) {
-        var flags = regexp.replace(/.*\/([gimy]*)$/, '$1').replace(regexp, '');
-        var pattern = regexp.replace(new RegExp('^/(.*?)/'+flags+'$'), '$1');
-        return $.extend(new Validator.Assert().Regexp(pattern, flags), { priority: 64 });
+        var flags = '';
+
+        // Test if RegExp is literal, if not, nothing to be done, otherwise, we need to isolate flags and pattern
+        if (!!(/^\/.*\/(?:[gimy]*)$/.test(regexp))) {
+          // Replace the regexp literal string with the first match group: ([gimy]*)
+          // If no flag is present, this will be a blank string
+          flags = regexp.replace(/.*\/([gimy]*)$/, '$1');
+          // Again, replace the regexp literal string with the first match group:
+          // everything excluding the opening and closing slashes and the flags
+          regexp = regexp.replace(new RegExp('^/(.*?)/' + flags + '$'), '$1');
+        }
+
+        return $.extend(new Validator.Assert().Regexp(regexp, flags), { priority: 64 });
       },
-      minlength: function (length) {
-        return $.extend(new Validator.Assert().Length({ min: length }), { priority: 30 });
+      minlength: function (value) {
+        return $.extend(new Validator.Assert().Length({ min: value }), {
+          priority: 30,
+          requirementsTransformer: function () {
+            return 'string' === typeof value && !isNaN(value) ? parseInt(value, 10) : value;
+          }
+        });
       },
-      maxlength: function (length) {
-        return $.extend(new Validator.Assert().Length({ max: length }), { priority: 30 });
+      maxlength: function (value) {
+        return $.extend(new Validator.Assert().Length({ max: value }), {
+        priority: 30,
+        requirementsTransformer: function () {
+            return 'string' === typeof value && !isNaN(value) ? parseInt(value, 10) : value;
+          }
+      });
       },
       length: function (array) {
         return $.extend(new Validator.Assert().Length({ min: array[0], max: array[1] }), { priority: 32 });
@@ -159,13 +179,31 @@ define('parsley/validator', [
         return this.length(array);
       },
       min: function (value) {
-        return $.extend(new Validator.Assert().GreaterThanOrEqual(value), { priority: 30 });
+        return $.extend(new Validator.Assert().GreaterThanOrEqual(value), {
+          priority: 30,
+          requirementsTransformer: function () {
+            return 'string' === typeof value && !isNaN(value) ? parseInt(value, 10) : value;
+          }
+        });
       },
       max: function (value) {
-        return $.extend(new Validator.Assert().LessThanOrEqual(value), { priority: 30 });
+        return $.extend(new Validator.Assert().LessThanOrEqual(value), {
+          priority: 30,
+          requirementsTransformer: function () {
+            return 'string' === typeof value && !isNaN(value) ? parseInt(value, 10) : value;
+          }
+        });
       },
       range: function (array) {
-        return $.extend(new Validator.Assert().Range(array[0], array[1]), { priority: 32 });
+        return $.extend(new Validator.Assert().Range(array[0], array[1]), {
+          priority: 32,
+          requirementsTransformer: function () {
+            for (var i = 0; i < array.length; i++)
+              array[i] = 'string' === typeof array[i] && !isNaN(array[i]) ? parseInt(array[i], 10) : array[i];
+
+            return array;
+          }
+        });
       },
       equalto: function (value) {
         return $.extend(new Validator.Assert().EqualTo(value), {
