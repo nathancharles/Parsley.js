@@ -23,11 +23,13 @@ define([
   'parsley/form',
   // `ParsleyField` Class. Handle field validation
   'parsley/field',
+  // `Multiple` Class. Extend `ParsleyField` to generate `ParsleyFieldMultiple`
+  'parsley/multiple',
   // Tiny Parsley Pub / Sub mechanism, used for `ParsleyUI` and Listeners
   'parsley/pubsub',
   // Default en constraints messages
   'i18n/en'
-], function (ParsleyUtils, ParsleyDefaults, ParsleyAbstract, ParsleyValidator, ParsleyUI, ParsleyOptionsFactory, ParsleyForm, ParsleyField) {
+], function (ParsleyUtils, ParsleyDefaults, ParsleyAbstract, ParsleyValidator, ParsleyUI, ParsleyOptionsFactory, ParsleyForm, ParsleyField, ParsleyMultiple) {
   // ### Parsley factory
   var Parsley = function (element, options, parsleyInstance) {
     this.__class__ = 'Parsley';
@@ -60,18 +62,71 @@ define([
       }
 
       // Handle 'static' options
-      this.OptionsFactory = new ParsleyOptionsFactory(ParsleyDefaults, ParsleyUtils.get(window, 'ParsleyConfig', {}), options, this.getNamespace(options));
-      options = this.OptionsFactory.get(this);
+      this.OptionsFactory = new ParsleyOptionsFactory(ParsleyDefaults, ParsleyUtils.get(window, 'ParsleyConfig') || {}, options, this.getNamespace(options));
+      this.options = this.OptionsFactory.get(this);
 
       // A ParsleyForm instance is obviously a `<form>` elem but also every node that is not an input and have `data-parsley-validate` attribute
-      if (this.$element.is('form') || (ParsleyUtils.attr(this.$element, options.namespace, 'validate') && !this.$element.is(options.inputs)))
+      if (this.$element.is('form') || (ParsleyUtils.attr(this.$element, this.options.namespace, 'validate') && !this.$element.is(this.options.inputs)))
         return this.bind('parsleyForm', parsleyInstance);
 
-      // Else every other element that is supported is binded as a `ParsleyField`
-      else if (this.$element.is(options.inputs))
-        return this.bind('parsleyField', parsleyInstance);
+      // Every other supported element and not excluded element is binded as a `ParsleyField` or `ParsleyFieldMultiple`
+      else if (this.$element.is(this.options.inputs) && !this.$element.is(this.options.excluded))
+        return this.isMultiple() ? this.handleMultiple(parsleyInstance) : this.bind('parsleyField', parsleyInstance);
 
       return this;
+    },
+
+    isMultiple: function () {
+      return (this.$element.is('input[type=radio], input[type=checkbox]') && 'undefined' === typeof this.options.multiple) || (this.$element.is('select') && 'undefined' !== typeof this.$element.attr('multiple'));
+    },
+
+    // Multiples fields are a real nightmare :(
+    handleMultiple: function (parsleyInstance) {
+      var that = this,
+        multiple,
+        parsleyMultipleInstance;
+
+      this.options = $.extend(this.options, ParsleyUtils.attr(this.$element, this.options.namespace));
+
+      if (this.options.multiple)
+        multiple = this.options.multiple;
+      else if ('undefined' !== typeof this.$element.attr('name') && this.$element.attr('name').length)
+        multiple = this.$element.attr('name');
+      else if ('undefined' !== typeof this.$element.attr('id') && this.$element.attr('id').length)
+        multiple = this.$element.attr('id');
+
+      // Special select multiple input
+      if (this.$element.is('select') && 'undefined' !== typeof this.$element.attr('multiple')) {
+        return this.bind('parsleyFieldMultiple', parsleyInstance, multiple || this.__id__);
+
+      // Else for radio / checkboxes, we need a `name` or `data-parsley-multiple` to properly bind it
+      } else if ('undefined' === typeof multiple) {
+        if (window.console && window.console.warn)
+          window.console.warn('To be binded by Parsley, a radio, a checkbox and a multiple select input must have either a name or a multiple option.', this.$element);
+
+        return this;
+      }
+
+      // Remove special chars
+      multiple = multiple.replace(/(:|\.|\[|\]|\$)/g, '');
+
+      // Check here if we don't already have a related multiple instance saved
+      if ($('[data-parsley-multiple=' + multiple +']').length)
+        for (var i = 0; i < $('[data-parsley-multiple=' + multiple +']').length; i++)
+          if ('undefined' !== typeof $($('[data-parsley-multiple=' + multiple +']').get(i)).data('Parsley')) {
+            parsleyMultipleInstance = $($('[data-parsley-multiple=' + multiple +']').get(i)).data('Parsley');
+
+            if (!this.$element.data('ParsleyFieldMultiple'))
+              parsleyMultipleInstance.addElement(this.$element);
+
+            break;
+          }
+
+      // Create a secret ParsleyField instance for every multiple field. It would be stored in `data('ParsleyFieldMultiple')`
+      // And would be useful later to access classic `ParsleyField` stuff while being in a `ParsleyFieldMultiple` instance
+      this.bind('parsleyField', parsleyInstance, multiple, true);
+
+      return parsleyMultipleInstance || this.bind('parsleyFieldMultiple', parsleyInstance, multiple);
     },
 
     // Retrieve namespace used for DOM-API
@@ -87,20 +142,48 @@ define([
       return ParsleyDefaults.namespace;
     },
 
-    // Return proper `ParsleyForm` or `ParsleyField`
-    bind: function (type, parentParsleyInstance) {
+    // Return proper `ParsleyForm`, `ParsleyField` or `ParsleyFieldMultiple`
+    bind: function (type, parentParsleyInstance, multiple, doNotStore) {
+      var parsleyInstance;
+
       switch (type) {
         case 'parsleyForm':
-          parsleyInstance = $.extend(new ParsleyForm(this.$element, parentParsleyInstance || this), new ParsleyAbstract(), window.ParsleyExtend);
+          parsleyInstance = $.extend(
+            new ParsleyForm(this.$element, parentParsleyInstance || this),
+            new ParsleyAbstract(),
+            window.ParsleyExtend
+          ).init();
           break;
         case 'parsleyField':
-          parsleyInstance = $.extend(new ParsleyField(this.$element, parentParsleyInstance || this), new ParsleyAbstract(), window.ParsleyExtend);
+          parsleyInstance = $.extend(
+            new ParsleyField(this.$element, parentParsleyInstance || this),
+            new ParsleyAbstract(),
+            window.ParsleyExtend
+          ).init();
+          break;
+        case 'parsleyFieldMultiple':
+          parsleyInstance = $.extend(
+            new ParsleyField(this.$element, parentParsleyInstance || this).init(),
+            new ParsleyAbstract(),
+            new ParsleyMultiple(),
+            window.ParsleyExtend
+          ).init(multiple);
           break;
         default:
           throw new Error(type + 'is not a supported Parsley type');
       }
 
-      if ('ParsleyForm' === parsleyInstance.__class__ || 'ParsleyField' === parsleyInstance.__class__) {
+      if ('undefined' !== typeof multiple)
+        ParsleyUtils.setAttr(this.$element, this.options.namespace, 'multiple', multiple);
+
+      if ('undefined' !== typeof doNotStore) {
+        this.$element.data('ParsleyFieldMultiple', parsleyInstance);
+
+        return parsleyInstance;
+      }
+
+      // Store instance if `ParsleyForm`, `ParsleyField` or `ParsleyFieldMultiple`
+      if (new RegExp('ParsleyF', 'i').test(parsleyInstance.__class__)) {
         // Store for later access the freshly binded instance in DOM element itself using jQuery `data()`
         this.$element.data('Parsley', parsleyInstance);
         this.__proxy__ = parsleyInstance.__class__;
@@ -116,13 +199,31 @@ define([
   // ### jQuery API
   // `$('.elem').parsley(options)` or `$('.elem').psly(options)`
   $.fn.parsley = $.fn.psly = function (options) {
+    if (this.length > 1) {
+      var instances = [];
+
+      this.each(function () {
+        instances.push($(this).parsley(options));
+      });
+
+      return instances;
+    }
+
+    // Return undefined if applied to non existing DOM element
+    if (!$(this).length) {
+      if (window.console && window.console.warn)
+        window.console.warn('You must bind Parsley on an existing element.');
+
+      return;
+    }
+
     return new Parsley(this, options);
   };
 
   // ### ParsleyUI
   // UI is a class apart that only listen to some events and them modify DOM accordingly
   // Could be overriden by defining a `window.ParsleyConfig.ParsleyUI` appropriate class (with `listen()` method basically)
-  window.ParsleyUI = 'function' === typeof ParsleyUtils.get(window.ParsleyConfig, 'ParsleyUI') ?
+  window.ParsleyUI = 'function' === typeof ParsleyUtils.get(window, 'ParsleyConfig.ParsleyUI') ?
     new window.ParsleyConfig.ParsleyUI().listen() : new ParsleyUI().listen();
 
   // ### ParsleyField and ParsleyForm extension
@@ -144,10 +245,9 @@ define([
   // Prevent it by setting `ParsleyConfig.autoBind` to `false`
   if (false !== ParsleyUtils.get(window, 'ParsleyConfig.autoBind'))
     $(document).ready(function () {
-      // Works only on `data-parsley-validate`. We dunno here user specific namespace
-      $('[data-parsley-validate]').each(function () {
-        new Parsley(this);
-      });
+      // Works only on `data-parsley-validate`.
+      if ($('[data-parsley-validate]').length)
+        $('[data-parsley-validate]').parsley();
     });
 
   return Parsley;

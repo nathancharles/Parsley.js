@@ -34,16 +34,47 @@ define(function () {
       it('should handle wrong errors-container option', function () {
         $('body').append('<input type="text" id="element" data-parsley-errors-container="#donotexist" />');
         window.console.warn = sinon.spy();
-        parsleyInstance = $('#element').psly();
+        var parsleyInstance = $('#element').psly();
         expect(window.console.warn.called).to.be(true);
       });
-      it('should add proper parsley class on success or failure', function () {
+      it('should add proper parsley class on success or failure (type=text)', function () {
         $('body').append('<input type="text" id="element" required />');
         var parsleyField = $('#element').psly();
         parsleyField.validate();
         expect($('#element').hasClass('parsley-error')).to.be(true);
         expect($('#element').hasClass('parsley-success')).to.be(false);
         $('#element').val('foo').psly().validate();
+        expect($('#element').hasClass('parsley-success')).to.be(true);
+        expect($('#element').hasClass('parsley-error')).to.be(false);
+      });
+      it('should add proper parsley class on success or failure (type=radio)', function () {
+        $('body').append('<input type="radio" id="element" required />');
+        var parsleyField = $('#element').psly();
+        parsleyField.validate();
+        expect($('#element').parent().hasClass('parsley-error')).to.be(true);
+        expect($('#element').parent().hasClass('parsley-success')).to.be(false);
+        $('#element').attr('checked', 'checked').psly().validate();
+        expect($('#element').parent().hasClass('parsley-success')).to.be(true);
+        expect($('#element').parent().hasClass('parsley-error')).to.be(false);
+      });
+      it('should add proper parsley class on success or failure (input=checkbox)', function () {
+        $('body').append('<input type="checkbox" id="element" required />');
+        var parsleyField = $('#element').psly();
+        parsleyField.validate();
+        expect($('#element').parent().hasClass('parsley-error')).to.be(true);
+        expect($('#element').parent().hasClass('parsley-success')).to.be(false);
+        $('#element').attr('checked', 'checked').psly().validate();
+        expect($('#element').parent().hasClass('parsley-success')).to.be(true);
+        expect($('#element').parent().hasClass('parsley-error')).to.be(false);
+      });
+      it('should add proper parsley class on success or failure (select multiple)', function () {
+        $('body').append('<select multiple id="element" required><option value="foo">foo</option></select>');
+        var parsleyField = $('#element').psly();
+        parsleyField.validate();
+        expect($('#element').hasClass('parsley-error')).to.be(true);
+        expect($('#element').hasClass('parsley-success')).to.be(false);
+        $('#element option[value="foo"]').attr('selected', 'selected');
+        parsleyField.validate();
         expect($('#element').hasClass('parsley-success')).to.be(true);
         expect($('#element').hasClass('parsley-error')).to.be(false);
       });
@@ -161,7 +192,7 @@ define(function () {
             '<div id="field2"></div>'                                         +
             '<textarea id="field3" data-parsley-notblank="true"></textarea>'  +
           '</form>');
-        parsleyForm = new Parsley($('#element'));
+        var parsleyForm = new Parsley($('#element'));
         expect($('#element').attr('novalidate')).not.to.be(undefined);
       });
       it('should test the no-focus option', function () {

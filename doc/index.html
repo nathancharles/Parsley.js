@@ -210,6 +210,32 @@
           <p>
             Parsley is a decoupled library that uses differents classes to do the heavy work. You'll see here the different protagonists involved and how you can configure them to fit your desired validation.
           </p>
+          <table class="table table-stripped table-bordered">
+            <thead>
+              <tr>
+                <th class="col-md-3">$ API</th>
+                <th class="col-md-1">Return</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>$('#existingForm').parsley(options)</code> <version>#2.0</version></td>
+                <td><code>parsleyFormInstance</code></td>
+              </tr>
+              <tr>
+                <td><code>$('#existingInput').parsley(options)</code> <version>#2.0</version></td>
+                <td><code>parsleyFieldInstance</code></td>
+              </tr>
+              <tr>
+                <td><code>$('#notExistingDOMElement').parsley(options)</code> <version>#2.0</version></td>
+                <td><code>undefined</code></td>
+              </tr>
+              <tr>
+                <td><code>$('.multipleElements').parsley(options)</code> <version>#2.0</version></td>
+                <td><code>Array[Instances]</code></td>
+              </tr>
+            </tbody>
+          </table>
           <div class="bs-callout bs-callout-warning">
             <h4>Look at the source code!</h4>
             <p>
@@ -283,6 +309,16 @@
                 </td>
                 <td>Validate form. Prevent submission if not valid. <strong>Fires <a href="#events">events</a> and affect UI.</strong>. You can only validate a certain group of fields by specifying optional <code>group</code> string parameter. If <code>group</code> given, only validate fields that belongs to this group. If <code>force</code> given, force validation even on non required fields (<a href="examples/events.html">See example</a>)</td>
               </tr>
+              <tr>
+                <td><code>reset()</code> <version>#2.0</version></td>
+                <td></td>
+                <td>Reset UI for this form and for its fields.</td>
+              </tr>
+              <tr>
+                <td><code>destroy()</code> <version>#2.0</version></td>
+                <td></td>
+                <td>Disable and destroy Parsley for this form and its fields.</td>
+              </tr>
             </tbody>
           </table>
 
@@ -319,6 +355,10 @@
               <tr>
                 <td><code>data-parsley-validate-if-empty</code> <version>#2.0</version></td>
                 <td>A field is by default not validated if not required and empty. By adding <code>data-parsley-validate-if-empty</code>, validation will be done even if field is empty. Useful if you need some custom validators that check something particular when field is empty.</td>
+              </tr>
+              <tr>
+                <td><code>data-parsley-trim-value</code> <version>#2.0</version></td>
+                <td>Trim field value <strong>only for Parsley validation</strong> (and not inside the input itself, data sent by your form won't be trimmed). Useful if your backend already do so and if trailing spaces could unnecessarily mess with your validation. Use <code>data-parsley-trim-value="true"</code>.</td>
               </tr>
               <tr>
                 <td><code>data-parsley-ui-enabled</code> <version>#2.0</version></td>
@@ -361,6 +401,16 @@
                   <code>[Violation [, Violation..]]</code> if fails
                 </td>
                 <td>Validate Field. <strong>Fires <a href="#events">events</a> and affect UI.</strong> If <code>force</code> given, force validation even on non required fields (<a href="examples/events.html">See example</a>)</td>
+              </tr>
+              <tr>
+                <td><code>reset()</code> <version>#2.0</version></td>
+                <td></td>
+                <td>Reset UI for this field.</td>
+              </tr>
+              <tr>
+                <td><code>destroy()</code> <version>#2.0</version></td>
+                <td></td>
+                <td>Disable and destroy Parsley for this field.</td>
               </tr>
             </tbody>
           </table>
@@ -697,7 +747,12 @@ window.ParsleyValidator
         <p>Naturally, all this is absolutely customizable, you'll see below how to configure your desired UX behavior.</p>
 
         <h3 id="ui-classes">Classes and templates</h3>
-        <p>Parsley adds its share of classes and elements. to be continued..</p>
+        <p>Parsley adds its share of classes and elements, to ease nice UI validation result display. By default, it will add <code>parsley-success</code> and <code>parley-error</code> classes depending on the validation result, <strong>on the input istelf for a simple text, textarea and select input, and on <u>the parent</u> for radio / checkboxes inputs.</strong></p>
+
+        <div class="bs-callout bs-callout-info">
+          <h4>Customize your classes</h4>
+          <p>You could change these classes'names in configuration, and the class holder element too.</p>
+        </div>
 
         <h3 id="ui-for-form">UI for form</h3>
         <table class="table table-stripped table-bordered">

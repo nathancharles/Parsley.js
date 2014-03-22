@@ -11,35 +11,17 @@ define('parsley/field', [
       throw new Error('You must give a Parsley instance');
 
     this.parsleyInstance = parsleyInstance;
-    return this.init($(field), parsleyInstance.options);
+    this.$element = $(field);
+    this.options = this.parsleyInstance.OptionsFactory.get(this);
   };
 
   ParsleyField.prototype = {
-    init: function ($element, options) {
+    init: function () {
       this.constraints = [];
-      this.$element = $element;
       this.validationResult = [];
-      this.options = this.parsleyInstance.OptionsFactory.get(this);
+      this.bindConstraints();
 
-      // Select / radio / checkbox multiple inputs hack
-      if ((this.$element.is('input[type=radio], input[type=checkbox]') && 'undefined' === typeof this.options.multiple) || (this.$element.is('select') && 'undefined' !== typeof this.$element.attr('multiple'))) {
-        if ('undefined' !== typeof this.$element.attr('name') && this.$element.attr('name').length)
-          this.options.multiple = this.$element.attr('name');
-        else if ('undefined' !== typeof this.$element.attr('id') && this.$element.attr('id').length)
-          this.options.multiple = this.$element.attr('id');
-
-        if ('undefined' === typeof this.options.multiple) {
-          if (window.console && window.console.warn)
-            window.console.warn('To be binded by Parsley, a radio, a checkbox and a multiple select input must have either a name, and id or a multiple option.', this.$element);
-
-          return this.parsleyInstance;
-        }
-
-        this.options.multiple = this.options.multiple.replace(/(:|\.|\[|\]|\$)/g, '');
-        ParsleyUtils.setAttr(this.$element, this.options.namespace, 'multiple', this.options.multiple);
-      }
-
-      return this.bindConstraints();
+      return this;
     },
 
     // Returns validationResult. For field, it could be:
@@ -76,14 +58,14 @@ define('parsley/field', [
 
     // Same @return as `validate()`
     isValid: function (force, value) {
+      // Recompute options and rebind constraints to have latest changes
+      this.refreshConstraints();
+
       // Sort priorities to validate more important first
       var priorities = this.getConstraintsSortedPriorities();
 
       // Value could be passed as argument, needed to add more power to 'parsley:field:validate'
       value = value || this.getValue();
-
-      // Recompute options and rebind constraints to have latest changes
-      this.refreshConstraints();
 
       // If a field is empty and not required, leave it alone, it's just fine
       // Except if `data-parsley-validate-if-empty` explicitely added, useful for some custom validators
@@ -111,36 +93,25 @@ define('parsley/field', [
     },
 
     getValue: function () {
+      var value;
+
       // Value could be overriden in DOM
       if ('undefined' !== typeof this.options.value)
-        return this.options.value;
+        value = this.options.value;
+      else
+        value = this.$element.val();
 
-      // Regular input, textarea and simple select
-      if ('undefined' === typeof this.options.multiple)
-        return this.$element.val();
+      // Use `data-parsley-trim-value="true"` to auto trim inputs entry
+      if (true === this.options.trimValue)
+        return value.replace(/^\s+|\s+$/g, '');
 
-      // Radio input case
-      if (this.$element.is('input[type=radio]'))
-        return $('[' + this.options.namespace + 'multiple="' + this.options.multiple + '"]:checked').val() || '';
-
-      // checkbox input case
-      if (this.$element.is('input[type=checkbox]')) {
-        var values = [];
-
-        $('[' + this.options.namespace + 'multiple="' + this.options.multiple + '"]:checked').each(function () {
-          values.push($(this).val());
-        });
-
-        return values.length ? values : '';
-      }
-
-      // Select multiple case
-      if (this.$element.is('select'))
-        return null === this.$element.val() ? '' : this.$element.val();
+      return value;
     },
 
     refreshConstraints: function () {
-      return this.actualizeOptions().bindConstraints();
+      this.actualizeOptions().bindConstraints();
+
+      return this;
     },
 
     bindConstraints: function () {
@@ -210,7 +181,7 @@ define('parsley/field', [
       name = name.toLowerCase();
 
       if ('function' === typeof window.ParsleyValidator.validators[name]) {
-        constraint = new ConstraintFactory(this, name, requirements, priority, isDomConstraint);
+        var constraint = new ConstraintFactory(this, name, requirements, priority, isDomConstraint);
 
         // if constraint already exist, delete it and push new version
         if (-1 !== this._constraintIndex(constraint.name))

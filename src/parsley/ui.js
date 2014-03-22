@@ -234,16 +234,25 @@ define('parsley/ui', [
       this.actualizeTriggers(fieldInstance);
     },
 
+    // Determine which element will have `parsley-error` and `parsley-success` classes
     _manageClassHandler: function (fieldInstance) {
+      // An element selector could be passed through DOM with `data-parsley-class-handler=#foo`
       if ('string' === typeof fieldInstance.options.classHandler && $(fieldInstance.options.classHandler).length)
         return $(fieldInstance.options.classHandler);
 
+      // Class handled could also be determined by function given in Parsley options
       var $handler = fieldInstance.options.classHandler(fieldInstance);
 
+      // If this function returned a valid existing DOM element, go for it
       if ('undefined' !== typeof $handler && $handler.length)
         return $handler;
 
-      return 'undefined' === typeof fieldInstance.options.multiple ? fieldInstance.$element : fieldInstance.$element.parent();
+      // Otherwise, if simple element (input, texatrea, select..) it will perfectly host the classes
+      if ('undefined' === typeof fieldInstance.options.multiple || fieldInstance.$element.is('select'))
+        return fieldInstance.$element;
+
+      // But if multiple element (radio, checkbox), that would be their parent
+      return fieldInstance.$element.parent();
     },
 
     _insertErrorWrapper: function (fieldInstance) {
@@ -315,6 +324,10 @@ define('parsley/ui', [
     },
 
     reset: function (parsleyInstance) {
+      // Nothing to do if UI never initialized for this field
+      if ('undefined' === typeof parsleyInstance._ui)
+        return;
+
       // Reset all event listeners
       parsleyInstance.$element.off('.Parsley');
       parsleyInstance.$element.off('.ParsleyFailedOnce');
@@ -337,6 +350,10 @@ define('parsley/ui', [
     },
 
     destroy: function (parsleyInstance) {
+      // Nothing to do if UI never initialized for this field
+      if ('undefined' === typeof parsleyInstance._ui)
+        return;
+
       this.reset(parsleyInstance);
 
       if ('ParsleyForm' === parsleyInstance.__class__)
